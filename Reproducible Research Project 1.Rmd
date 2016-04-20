@@ -1,0 +1,158 @@
+---
+title: "Reproducible Research Project 1"
+author: "Philip Short"
+date: "April 19, 2016"
+output: html_document
+---
+---
+title: "Reproducible Research"
+author: "Philip Short"
+date: "April 19, 2016"
+output: html_document
+---
+
+## Introduction
+This was the first project for the **Reproducible Research** course in Coursera's Data Science specialization track.
+
+### Data
+The data for this assignment was downloaded from the course web
+site:
+
+* Dataset: [Activity monitoring data](https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip) [52K]
+
+The variables included in this dataset are:
+
+* **steps**: Number of steps taking in a 5-minute interval (missing
+    values are coded as `NA`)
+
+* **date**: The date on which the measurement was taken in YYYY-MM-DD
+    format
+
+* **interval**: Identifier for the 5-minute interval in which
+    measurement was taken
+
+The dataset is stored in a comma-separated-value (CSV) file and there are a total of 17,568 observations in this dataset.
+
+## Loading and preprocessing the data
+### loading libraries to be used with data.
+```{r}
+
+library(knitr)
+library(dplyr)
+library(lubridate)
+library(ggplot2)
+```
+### Loading in CSV file from current directory
+```{r}
+data <- read.csv("activity.csv", header = TRUE, sep = ',', colClasses = c("numeric", "character", "integer"))
+```
+
+###cleaning up and checking the activity.csv data. 
+
+```{r}
+
+data$date <-ymd(data$date)
+
+str(data)
+head(data)
+```
+
+
+## What is mean total number of steps taken per day?
+```{r}
+steps <- data %>%
+  filter(!is.na(steps)) %>%
+  group_by(date) %>%
+  summarize(steps = sum(steps))
+
+
+mean_steps <- mean(steps$steps, na.rm = TRUE)
+median_steps <- median(steps$steps, na.rm = TRUE)
+
+p <-ggplot(steps, aes(x = steps)) +geom_histogram(fill = "blue", binwidth = 1000)+labs(title = "Histogram of Steps Per Day", x = "Steps Per Day", y = "Frequency")
+```
+Add lines for mean and median on plot
+```{r}
+p <-p + geom_vline(xintercept = median_steps, color ="red") +geom_vline(xintercept = mean_steps, color="green", linetype = "longdash")
+```
+Add text to tell mean and meadian values on plot
+```{r}
+p + annotate("text", x = 2000, y = 7, label = "mean: 10,766") + annotate("text", x= 2000, y=5, label="median: 10,765")
+
+mean_steps
+median_steps
+```
+## What is the average daily activity pattern?
+
+```{r}
+
+interval <- data %>%filter(!is.na(steps)) %>%group_by(interval) %>%summarize(steps = mean(steps))
+ggplot(interval, aes(x=interval, y=steps)) + geom_line(color = "green")
+
+a <- interval[which.max(interval$steps),]
+Steps_High <-a$steps
+Interval_High <-a$interval
+ 
+Interval_High
+Steps_High
+
+```
+
+## Imputing missing values
+Checking for number of 'NA's in the data
+```{r}
+sum(is.na(data$steps))
+```
+Now cleaning the data
+```{r}
+data_full <- data
+nas <- is.na(data_full$steps)
+avg_interval <- tapply(data_full$steps, data_full$interval, mean, na.rm=TRUE, simplify=TRUE)
+data_full$steps[nas] <- avg_interval[as.character(data_full$interval[nas])]
+```
+
+
+```{r}
+steps_full <- data_full %>%
+  filter(!is.na(steps)) %>%
+  group_by(date) %>%
+  summarize(steps = sum(steps))
+
+ggplot(steps_full, aes(x = steps)) +
+  geom_histogram(fill = "red", binwidth = 1000) +
+  labs(title = "Histogram of Steps Per Day: with missing values", x = "Steps per day", y = "Frequency")
+```
+
+```{r}
+mean_steps_full <- mean(steps_full$steps, na.rm = TRUE)
+median_steps_full <- median(steps_full$steps, na.rm = TRUE)
+
+mean_steps_full
+median_steps_full
+```
+
+## Are there differences in activity patterns between weekdays and weekends?
+
+Pulliung out data that was collected on the weekend, using weekdays() and mutate() to add a new coloumn to the data.
+```{r}
+data_full <- mutate(data_full, weektype = ifelse(weekdays(data_full$date) == "Saturday" | weekdays(data_full$date) == "Sunday", "weekend", "weekday"))
+data_full$weektype <- as.factor(data_full$weektype)
+```
+
+```{r}
+interval_full <- data_full %>%
+  group_by(interval, weektype) %>%
+  summarise(steps = mean(steps))
+```
+Plotting of weekday vs weekend
+```{r}
+ ggplot(interval_full, aes(x=interval, y=steps, color = weektype)) +
+  geom_line() +
+  facet_wrap(~weektype, ncol = 1, nrow=2)
+
+
+```
+
+
+
+The avgerage number of steps is higher on the weekend, which makes sense that the user is probably sitting at work or school more during the weekday.
